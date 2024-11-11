@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+
     <style>
         body, h1 { font-family: "Raleway", Arial, sans-serif; }
         body {
@@ -17,109 +18,97 @@
             background-color: rgba(0, 0, 0, 0.5);
             padding: 20px;
             border-radius: 10px;
+            margin-bottom: 20px;
         }
-        .content { display: block; margin-top: 20px; }
-        
-
+        .content { display: block; }
     </style>
     <script>
-        function startSpeechRecognition() {
-    const output = document.getElementById('speech-output');
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'en-US'; // Set the language
-    recognition.interimResults = true; // Show interim results
-    recognition.continuous = true; // Keep recognition active until stopped
+        let timerInterval;
 
-    let fullTranscript = ""; // Variable to store the full transcript
+        function startTimer() {
+            const hours = parseInt(document.getElementById('timer-hours').value) || 0;
+            const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
+            const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+            let totalTime = hours * 3600 + minutes * 60 + seconds;
 
-    recognition.onresult = function(event) {
-        const transcript = Array.from(event.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join('');
+            if (timerInterval) clearInterval(timerInterval);
 
-        // Update the transcript with new results
-        fullTranscript = transcript; // Store the full transcript
-        output.innerHTML = `<div>${fullTranscript}</div>`; // Display the current transcript
+            timerInterval = setInterval(() => {
+                if (totalTime <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timer-display').innerText = "Timer Done!";
+                    return;
+                }
 
-        // Check if the user says "stop recording"
-        if (transcript.toLowerCase().includes("stop recording")) {
-            recognition.stop(); // Stop the recognition
-            output.innerHTML += "<div>Stopped listening. You can start again.</div>"; // Show stop message
+                const displayHours = Math.floor(totalTime / 3600);
+                const displayMinutes = Math.floor((totalTime % 3600) / 60);
+                const displaySeconds = totalTime % 60;
+                document.getElementById('timer-display').innerText =
+                    `Timer: ${displayHours}h ${displayMinutes}m ${displaySeconds}s`;
+                totalTime--;
+            }, 1000);
         }
-    };
 
-    recognition.onerror = function(event) {
-        output.innerHTML = `<div>Error occurred in recognition: ${event.error}</div>`;
-    };
+        function startSpeechRecognition() {
+            const output = document.getElementById('speech-output');
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = true;
+            recognition.continuous = true;
 
-    recognition.onend = function() {
-        // Do nothing on end if it was stopped by the user
-        // You may want to show a message if it ends unexpectedly
-    };
-
-    recognition.start(); // Start the speech recognition
-}
+            recognition.onresult = function(event) {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                output.innerHTML = `<div>${transcript}</div>`;
+                if (transcript.toLowerCase().includes("stop recording")) recognition.stop();
+            };
+            recognition.start();
+        }
     </script>
 </head>
 <body>
 
 <header>
     <h1 class="w3-panel w3-center w3-opacity">App Title</h1>
-    <nav class="w3-bar w3-border w3-center">
-        <form method="POST">
-            <button class="w3-bar-item w3-button" type="submit" name="show" value="tasks">Task List</button>
-            <button class="w3-bar-item w3-button" type="submit" name="show" value="timer">Set Timer</button>
-        </form>
-    </nav>
 </header>
 
-<div id="dynamic-content" class="w3-content" style="max-width:1500px; margin-top: 20px;">
-    {% if request.method == 'POST' %}
-    
-        {% if request.form.get('show') == 'tasks' %}
-            <h2>Task List</h2>
-            <form method="POST">
-                <input type="text" name="task" placeholder="Enter a new task" required>
-                <button type="submit" name="add_task">Add Task</button>
-            </form>
-            <div id="task-list">
-                {% for task in tasks %}
-                    <div>
-                        <form method="POST">
-                        {{ task.task }} {{ '✅' if task.done else '' }}
-                        <button type="submit" name="mark_done" value="{{ loop.index0 }}">Done</button>
-                        <button type="submit" name="remove_task" value="{{ loop.index0 }}">Remove</button>
-                        </form>
-                    </div>
-                {% endfor %}
+<div id="tasks-section" class="w3-content">
+    <h2>Task List</h2>
+    <form method="POST">
+        <input type="text" name="task" placeholder="Enter a new task" required>
+        <button type="submit" name="add_task">Add Task</button>
+    </form>
+    <div id="task-list">
+        {% for task in tasks %}
+            <div>
+                <form method="POST">
+                    {{ task.task }} {{ '✅' if task.done else '' }}
+                    <button type="submit" name="mark_done" value="{{ loop.index0 }}">Done</button>
+                    <button type="submit" name="remove_task" value="{{ loop.index0 }}">Remove</button>
+                </form>
             </div>
-        {% elif request.form.get('show') == 'timer' %}
-            <h2>Set Timer</h2>
-            <form method="POST">
-                <input type="number" name="hours" placeholder="Hours" required>
-                <input type="number" name="minutes" placeholder="Minutes" required>
-                <input type="number" name="seconds" placeholder="Seconds" required>
-                <button type="submit" name="set_timer">Start Timer</button>
-            </form>
-            <div id="timer-display">
-                Timer: {{ timer.hours }}h {{ timer.minutes }}m {{ timer.seconds }}s
-            </div>
-        {% endif %}
-    {% endif %}
+        {% endfor %}
+    </div>
 </div>
 
-<div id="speech-section" style="margin: 20px; padding: 15px;">
+<div id="timer-section" class="w3-content">
+    <h2>Set Timer</h2>
+    <form onsubmit="event.preventDefault(); startTimer();">
+        <input id="timer-hours" type="number" name="hours" placeholder="Hours" required>
+        <input id="timer-minutes" type="number" name="minutes" placeholder="Minutes" required>
+        <input id="timer-seconds" type="number" name="seconds" placeholder="Seconds" required>
+        <button type="submit">Start Timer</button>
+    </form>
+    <div id="timer-display">Timer: 0h 0m 0s</div>
+</div>
+
+<div id="speech-section" class="w3-content">
     <h2>Speech Recognition</h2>
     <button onclick="startSpeechRecognition()">Start Recording Instructions</button>
-    <p>Hello!</p>
     <div id="speech-output">{{ speech_text }}</div>
 </div>
 
-<br>
-<br>
-<br>
-<br>
 <footer class="w3-container w3-padding-64 w3-light-grey w3-center w3-large"> 
     <p>Contact <a href="https://www.w3schools.com/w3css/default.asp" target="_blank" class="w3-hover-text-green">Us</a></p>
 </footer>
