@@ -20,57 +20,143 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
-        .content { display: block; }
+        #timer-display h1 {
+            font-size: 5em;
+            text-align: center;
+        }
+        #timer-display .done {
+            color: lime;
+        }
+        #task-list div {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        #speech-output {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
     </style>
     <script>
-        let timerInterval;
+        let timerInterval, pausedTime, isTimerPaused = false;
 
         function startTimer() {
+            clearInterval(timerInterval);
+            isTimerPaused = false;
             const hours = parseInt(document.getElementById('timer-hours').value) || 0;
             const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
             const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
-            let totalTime = hours * 3600 + minutes * 60 + seconds;
+            pausedTime = hours * 3600 + minutes * 60 + seconds;
 
-            if (timerInterval) clearInterval(timerInterval);
-
-            timerInterval = setInterval(() => {
-                if (totalTime <= 0) {
-                    clearInterval(timerInterval);
-                    document.getElementById('timer-display').innerText = "Timer Done!";
-                    return;
-                }
-
-                const displayHours = Math.floor(totalTime / 3600);
-                const displayMinutes = Math.floor((totalTime % 3600) / 60);
-                const displaySeconds = totalTime % 60;
-                document.getElementById('timer-display').innerText =
-                    `Timer: ${displayHours}h ${displayMinutes}m ${displaySeconds}s`;
-                totalTime--;
-            }, 1000);
+            document.getElementById('pause-resume-timer').innerText = "Pause";
+            resumeTimer();
         }
 
-        function startSpeechRecognition() {
-            const output = document.getElementById('speech-output');
-            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = 'en-US';
-            recognition.interimResults = true;
-            recognition.continuous = true;
+        function togglePauseResumeTimer() {
+            if (isTimerPaused) {
+                resumeTimer();
+                document.getElementById('pause-resume-timer').innerText = "Pause";
+            } else {
+                pauseTimer();
+                document.getElementById('pause-resume-timer').innerText = "Resume";
+            }
+        }
 
-            recognition.onresult = function(event) {
-                const transcript = Array.from(event.results)
-                    .map(result => result[0].transcript)
-                    .join('');
-                output.innerHTML = `<div>${transcript}</div>`;
-                if (transcript.toLowerCase().includes("stop recording")) recognition.stop();
-            };
-            recognition.start();
+        function pauseTimer() {
+            isTimerPaused = true;
+            clearInterval(timerInterval);
+        }
+
+        function resumeTimer() {
+            if (pausedTime > 0) {
+                isTimerPaused = false;
+                timerInterval = setInterval(() => {
+                    if (pausedTime <= 0) {
+                        clearInterval(timerInterval);
+                        document.getElementById('timer-display').innerHTML =
+                            `<h1 class="done">Timer Done!</h1>`;
+                        return;
+                    }
+                    const displayHours = Math.floor(pausedTime / 3600);
+                    const displayMinutes = Math.floor((pausedTime % 3600) / 60);
+                    const displaySeconds = pausedTime % 60;
+                    document.getElementById('timer-display').innerHTML =
+                        `<h1>${displayHours}h ${displayMinutes}m ${displaySeconds}s</h1>`;
+                    pausedTime--;
+                }, 1000);
+            }
+        }
+
+        let recognition, isSpeechPaused = false;
+
+        let recognizedSpeech = "";
+
+function startSpeechRecognition() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onresult = function (event) {
+        recognizedSpeech = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
+        document.getElementById('speech-output').innerHTML = `<p>${recognizedSpeech}</p>`;
+    };
+
+    recognition.onerror = function (event) {
+        console.error("Speech recognition error:", event.error);
+    };
+
+    recognition.start();
+}
+
+function submitSpeechInput() {
+    if (recognizedSpeech) {
+        fetch("/", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ speech_input: recognizedSpeech, get_image: recognizedSpeech })
+        }).then(response => response.text())
+          .then(data => {
+              document.open();
+              document.write(data);
+              document.close();
+          })
+          .catch(error => console.error("Error submitting speech input:", error));
+    } else {
+        alert("No speech recognized. Please try again.");
+    }
+}
+
+        function togglePauseResumeSpeech() {
+            if (isSpeechPaused) {
+                resumeSpeechRecognition();
+                document.getElementById('pause-resume-speech').innerText = "Pause";
+            } else {
+                pauseSpeechRecognition();
+                document.getElementById('pause-resume-speech').innerText = "Resume";
+            }
+        }
+
+        function pauseSpeechRecognition() {
+            if (recognition) {
+                recognition.stop();
+                isSpeechPaused = true;
+            }
+        }
+
+        function resumeSpeechRecognition() {
+            if (recognition) {
+                recognition.start();
+                isSpeechPaused = false;
+            }
         }
     </script>
 </head>
 <body>
 
 <header>
-    <h1 class="w3-panel w3-center w3-opacity">β𝑥 Momentum</h1>
+    <h1 class="w3-panel w3-center w3-opacity"><i>β</i><b>𝑥</b> Momentum</h1>
 </header>
 
 <div id="tasks-section" class="w3-content">
@@ -99,14 +185,24 @@
         <input id="timer-minutes" type="number" name="minutes" placeholder="Minutes" required>
         <input id="timer-seconds" type="number" name="seconds" placeholder="Seconds" required>
         <button type="submit">Start Timer</button>
+        <button type="button" id="pause-resume-timer" onclick="togglePauseResumeTimer()">Pause</button>
     </form>
-    <div id="timer-display">Timer: 0h 0m 0s</div>
+    <div id="timer-display">
+        <h1>00:00:00</h1>
+    </div>
 </div>
 
 <div id="speech-section" class="w3-content">
     <h2>Speech Recognition</h2>
-    <button onclick="startSpeechRecognition()">Start Recording Instructions</button>
-    <div id="speech-output">{{ speech_text }}</div>
+    <button type="button" onclick="startSpeechRecognition()">Start Recording</button>
+    <button type="button" id="pause-resume-speech" onclick="togglePauseResumeSpeech()">Pause</button>
+    <button type="button" onclick="submitSpeechInput()">Get Image</button>
+    <div id="speech-output">
+        <p>{{ speech_text }}</p>
+        {% if image_link %}
+            <p>Generated Image: <a href="{{ image_link }}" target="_blank">Open Image</a></p>
+        {% endif %}
+    </div>
 </div>
 
 <footer class="w3-container w3-padding-64 w3-light-grey w3-center w3-large"> 
