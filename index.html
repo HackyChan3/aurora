@@ -188,14 +188,13 @@ function submitSpeechInput() {
         <button type="button" id="pause-resume-timer" onclick="togglePauseResumeTimer()">Pause</button>
     </form>
     <div id="timer-display">
-        <h1>00:00:00</h1>
+        <h1>0h 0m 0s</h1>
     </div>
 </div>
 
 <div id="speech-section" class="w3-content">
     <h2>Speech Recognition</h2>
     <button type="button" onclick="startSpeechRecognition()">Start Recording</button>
-    <button type="button" id="pause-resume-speech" onclick="togglePauseResumeSpeech()">Pause</button>
     <button type="button" onclick="submitSpeechInput()">Get Image</button>
     <div id="speech-output">
         <p>{{ speech_text }}</p>
